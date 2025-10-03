@@ -254,6 +254,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/start - Begin authentication or check your status.\n"
         "/getlink - Reply to a file to create a shareable link.\n"
         "/help - Show this help message.\n"
+        "/info - Display bot status.\n\n"
         "Once authenticated, you can send any file to have it processed or use /getlink."
     )
 
