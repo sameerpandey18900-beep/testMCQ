@@ -1,4 +1,3 @@
-
 import os
 import uuid
 import sqlite3
@@ -8,15 +7,15 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 import asyncio
 
-TELEGRAM_TOKEN = os.environ.get("8379093665:AAFKQKg4K8Zsi0TS5b2p2evmSvbcBNSi_YQ")
-LITESHORT_API_KEY = os.environ.get("be1528376cd25a510dce1e3e063ed856e5421250")
-SERVER_URL = os.environ.get("https://testmcq.onrender.com")  # e.g., https://myapp.onrender.com/activate
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+LITESHORT_API_KEY = os.environ.get("LITESHORT_API_KEY")
+SERVER_URL = os.environ.get("SERVER_URL")  # e.g., https://yourapp.onrender.com/activate
 DB = "database.db"
 
 bot = Bot(TELEGRAM_TOKEN)
 dp = Dispatcher()
 
-# --- Database ---
+# --- Database functions ---
 def init_db():
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -58,7 +57,7 @@ def check_access(user_id):
             return True, expiry
     return False, None
 
-# --- LiteShort link generator ---
+# --- LiteShort shortener ---
 def shorten_link(session_id):
     long_url = f"{SERVER_URL}?session={session_id}"
     api_url = f"https://liteshort.com/api?api={LITESHORT_API_KEY}&url={long_url}&format=text"
@@ -67,7 +66,7 @@ def shorten_link(session_id):
         return resp.text.strip()
     return long_url
 
-# --- Telegram Handlers ---
+# --- Telegram handlers ---
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
     user_id = message.from_user.id
@@ -86,3 +85,22 @@ async def timeleft_handler(message: types.Message):
         minutes = (remaining.seconds % 3600) // 60
         await message.answer(f"⏱ You have {hours}h {minutes}m left of access.")
     else:
+        await message.answer("⚠️ You have no active access. Send /start to unlock 24h.")
+
+@dp.message()
+async def handle_message(message: types.Message):
+    user_id = message.from_user.id
+    ok, expiry = check_access(user_id)
+    if ok:
+        await message.answer(f"✅ Access granted until {expiry.strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        # ✅ Fixed indentation here
+        await message.answer("⚠️ Access expired. Send /start to unlock again.")
+
+# --- Run bot ---
+async def main():
+    init_db()
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
