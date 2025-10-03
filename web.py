@@ -3,6 +3,7 @@ import os
 import json
 import secrets
 from datetime import datetime, timedelta
+import pytz  # Added for timezone support
 
 import httpx  # Using httpx for asynchronous HTTP requests
 from telegram import Update
@@ -11,7 +12,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # --- Configuration ---
 # It's best practice to load sensitive data from environment variables.
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "7634447028:AAFSw_8NlhYt32WPLwsrCTVPTOJYMxtrX38")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8379093665:AAFKQKg4K8Zsi0TS5b2p2evmSvbcBNSi_YQ")
 LITESHORT_API_KEY = os.environ.get("LITESHORT_API_KEY", "be1528376cd25a510dce1e3e063ed856e5421250")
 
 LITESHORT_API_URL = "https://liteshort.com/api"
@@ -253,18 +254,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/start - Begin authentication or check your status.\n"
         "/getlink - Reply to a file to create a shareable link.\n"
         "/help - Show this help message.\n"
-        "/info - Display bot status.\n\n"
         "Once authenticated, you can send any file to have it processed or use /getlink."
     )
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays information about the bot's current status."""
-    current_time = "Friday, October 3, 2025 at 8:41 PM IST"
-    current_location = "Kota, Rajasthan, India"
+    # Set the timezone to Indian Standard Time
+    ist = pytz.timezone('Asia/Kolkata')
+    # Get the current time in IST and format it
+    current_time_ist = datetime.now(ist).strftime("%A, %B %d, %Y at %I:%M %p %Z")
+    current_location = "India"
     await update.message.reply_html(
         "<b>🤖 Bot Status</b>\n\n"
         f"<b>📍 Location:</b> {current_location}\n"
-        f"<b>⏰ Server Time:</b> {current_time}\n\n"
+        f"<b>⏰ Server Time:</b> {current_time_ist}\n\n"
         "Everything is running smoothly!"
     )
 
