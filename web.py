@@ -1,3 +1,4 @@
+app.run(host="0.0.0.0", port=8080)
 git init
 git add .
 git commit -m "Initial commit"
