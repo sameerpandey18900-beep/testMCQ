@@ -1,115 +1,64 @@
 import os
-import sqlite3
+import requests
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import asyncio
 from datetime import datetime, timedelta
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-import requests
 
 # --- Load environment variables ---
-TELEGRAM_TOKEN = os.environ.get("8379093665:AAFKQKg4K8Zsi0TS5b2p2evmSvbcBNSi_YQ")
-LITESHORT_API_KEY = os.environ.get("be1528376cd25a510dce1e3e063ed856e5421250")
-SERVER_URL = os.environ.get("https://testmcq.onrender.com/activate")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+LITESHORT_API_KEY = os.environ.get("LITESHORT_API_KEY")
+SERVER_URL = os.environ.get("SERVER_URL")
 
 if not TELEGRAM_TOKEN or not LITESHORT_API_KEY or not SERVER_URL:
     raise ValueError("❌ Missing environment variables")
 
-bot = Bot(token=TELEGRAM_TOKEN)
-dp = Dispatcher()
+# --- Helper to shorten URLs ---
+def shorten_url(long_url):
+    try:
+        api_url = f"https://liteshort.com/api?api={LITESHORT_API_KEY}&url={long_url}&format=text"
+        response = requests.get(api_url)
+        if response.status_code == 200:
+            return response.text.strip()
+        return long_url
+    except Exception as e:
+        print("Error shortening URL:", e)
+        return long_url
 
-# --- Database ---
-DB = "database.db"
+# --- Countdown storage ---
+active_sessions = {}  # user_id: expiry_time
 
-def init_db():
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS tokens (
-            session_id TEXT PRIMARY KEY,
-            user_id INTEGER,
-            expiry TEXT,
-            status TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
+# --- /start command ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    now = datetime.utcnow()
+    expiry = now + timedelta(hours=24)
+    active_sessions[user_id] = expiry
 
-init_db()
+    short_link = shorten_url(SERVER_URL)
 
-# --- Activate session ---
-def activate_session(session_id, user_id=None):
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    expiry = (datetime.now() + timedelta(hours=24)).isoformat()
-    c.execute("""
-        INSERT OR REPLACE INTO tokens (session_id, user_id, expiry, status)
-        VALUES (?, ?, ?, 'active')
-    """, (session_id, user_id, expiry))
-    conn.commit()
-    conn.close()
+    await update.message.reply_text(
+        f"✅ 24h access granted!\n⏳ Countdown started at UTC {now.strftime('%Y-%m-%d %H:%M:%S')}\nAccess link: {short_link}"
+    )
 
-    if user_id:
-        asyncio.create_task(send_access_message(user_id, expiry))
-
-# --- Countdown message ---
-async def send_access_message(user_id, expiry_iso):
-    expiry = datetime.fromisoformat(expiry_iso)
-    remaining = expiry - datetime.now()
-    hours = remaining.seconds // 3600
-    minutes = (remaining.seconds % 3600) // 60
-    msg = await bot.send_message(user_id, f"✅ Access granted!\n⏱ Time left: {hours}h {minutes}m")
-
+# --- Background task to remove expired sessions ---
+async def check_sessions():
     while True:
-        await asyncio.sleep(900)  # update every 15 minutes
-        remaining = expiry - datetime.now()
-        if remaining.total_seconds() <= 0:
-            try:
-                await msg.edit_text("⏰ Your 24h access has expired!")
-            except:
-                pass
-            break
-        hours = remaining.seconds // 3600
-        minutes = (remaining.seconds % 3600) // 60
-        try:
-            await msg.edit_text(f"✅ Access granted!\n⏱ Time left: {hours}h {minutes}m")
-        except:
-            break
-
-# --- Telegram commands ---
-@dp.message(Command("start"))
-async def start(message: types.Message):
-    session_id = os.urandom(8).hex()
-    user_id = message.from_user.id
-    activate_session(session_id, user_id)
-
-    # Generate LiteShort link dynamically
-    short_link = requests.get(
-        f"https://liteshort.com/api?api={LITESHORT_API_KEY}&url={SERVER_URL}?session={session_id}&user={user_id}&format=text"
-    ).text
-
-    await message.answer(f"Click this link to activate 24h access:\n{short_link}")
-
-@dp.message(Command("timeleft"))
-async def timeleft(message: types.Message):
-    user_id = message.from_user.id
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("SELECT expiry FROM tokens WHERE user_id=? AND status='active'", (user_id,))
-    row = c.fetchone()
-    conn.close()
-
-    if row:
-        expiry = datetime.fromisoformat(row[0])
-        remaining = expiry - datetime.now()
-        hours = remaining.seconds // 3600
-        minutes = (remaining.seconds % 3600) // 60
-        await message.answer(f"⏱ Time left: {hours}h {minutes}m")
-    else:
-        await message.answer("❌ You have no active access.")
+        now = datetime.utcnow()
+        expired_users = [uid for uid, exp in active_sessions.items() if now > exp]
+        for uid in expired_users:
+            print(f"Session expired for user {uid}")
+            del active_sessions[uid]
+        await asyncio.sleep(900)  # check every 15 minutes
 
 # --- Run bot ---
 async def main():
-    await dp.start_polling(bot)
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.create_task(check_sessions())
+    print("Bot is running...")
+    await app.run_polling()
 
 if __name__ == "__main__":
+    import asyncio
     asyncio.run(main())
