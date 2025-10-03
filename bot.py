@@ -3,6 +3,7 @@ import sqlite3
 import asyncio
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 from aiogram.types import Message
 import requests
 
@@ -53,27 +54,31 @@ def activate_session(session_id, user_id=None):
         asyncio.create_task(send_access_message(user_id, expiry))
 
 # --- Send access granted message with edited countdown ---
-async def send_access_message(user_id, expiry):
-    hours = (expiry - datetime.now()).seconds // 3600
-    minutes = ((expiry - datetime.now()).seconds % 3600) // 60
+async def send_access_message(user_id, expiry_iso):
+    expiry = datetime.fromisoformat(expiry_iso)
+    remaining = expiry - datetime.now()
+    hours = remaining.seconds // 3600
+    minutes = (remaining.seconds % 3600) // 60
     msg: Message = await bot.send_message(user_id, f"✅ Access granted!\n⏱ Time left: {hours}h {minutes}m")
 
     while True:
         await asyncio.sleep(900)  # 15 minutes
         remaining = expiry - datetime.now()
         if remaining.total_seconds() <= 0:
-            await msg.edit_text("⏰ Your 24h access has expired!")
+            try:
+                await msg.edit_text("⏰ Your 24h access has expired!")
+            except:
+                pass
             break
         hours = remaining.seconds // 3600
         minutes = (remaining.seconds % 3600) // 60
         try:
             await msg.edit_text(f"✅ Access granted!\n⏱ Time left: {hours}h {minutes}m")
         except:
-            # Message might have been deleted, ignore errors
-            break
+            break  # If message deleted or failed, stop updating
 
 # --- Commands ---
-@dp.message(commands=["start"])
+@dp.message(Command("start"))
 async def start(message: types.Message):
     session_id = os.urandom(8).hex()
     user_id = message.from_user.id
@@ -86,7 +91,8 @@ async def start(message: types.Message):
 
     await message.answer(f"Click this link to activate 24h access:\n{short_link}")
 
-@dp.message(commands=["timeleft"])
+
+@dp.message(Command("timeleft"))
 async def timeleft(message: types.Message):
     user_id = message.from_user.id
     conn = sqlite3.connect(DB)
