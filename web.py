@@ -12,8 +12,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # --- Configuration ---
 # It's best practice to load sensitive data from environment variables.
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8379093665:AAFKQKg4K8Zsi0TS5b2p2evmSvbcBNSi_YQ")
-LITESHORT_API_KEY = os.environ.get("LITESHORT_API_KEY", "be1528376cd25a510dce1e3e063ed856e5421250")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8385743179:AAFGeN6cO1vmrOdmTvu1IRuMTSCLg6KdQAA")
+LITESHORT_API_KEY = os.environ.get("LITESHORT_API_KEY", "3872aef59e2371b1a6db2155cfa6c7a18aa08d64")
 
 LITESHORT_API_URL = "https://liteshort.com/api"
 AUTHENTICATION_EXPIRATION_HOURS = 24
